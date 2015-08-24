@@ -1,0 +1,88 @@
+---
+title: "Predicting Excercise Type with Sensor Data"
+author: "P D"
+date: "Sunday, August 23, 2015"
+output: html_document
+---
+```{r include=FALSE}
+#rm(list = ls())
+#gc()
+library(caret); library(kernlab) ; library(randomForest) ; library(ROCR); library(ggplot2)
+#install.packages("doParallel")
+#library(doParallel)
+#registerDoParallel(cores=4)
+#set.seed(32343)
+
+act.trn  <- read.csv("pml/pml-training.csv")
+act.tst  <- read.csv("pml/pml-testing.csv")
+
+#act.trn  <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
+#act.tst  <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+
+
+
+#Identify columns without blank values or NA
+summary(act.trn)
+act.trn  <-  data.frame(act.trn[,c(160,9:11,37:49,60:68,84:86,102,113:124,140,151:159)])
+act.tst  <-  data.frame(act.tst[,c(160,9:11,37:49,60:68,84:86,102,113:124,140,151:159)])
+
+
+#Training
+ind <- sample(2, nrow(act.trn), replace = TRUE, prob = c(.75,.25))
+dim(act.trn[ind == 1,]) ; dim(act.trn[ind == 2,])
+act.rf <- randomForest(classe ~ ., data=act.trn[ind == 1,])
+act.pred <- predict(act.rf, act.trn[ind == 2,])
+length(act.pred) ; length(act.trn[ind==2, "classe"])
+cnf  <- confusionMatrix(act.pred, act.trn[ind==2, "classe"])
+
+
+#New Data
+system.time(act.rf <- randomForest(classe ~ ., data=act.trn))
+act.pred <- predict(act.rf,newdata=act.tst)
+act.pred.prob <- predict(act.rf,type="prob",newdata=act.tst)
+varImp(act.rf, scale = TRUE)
+
+```
+<b>Project Summary</b><br>
+The project goal was to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants and then predict the manner in which 20 cases did the exercise and categorize them in 1 of 5 exercise typs. We can determine from the goal that this is a classification problem.
+
+<b>Data Cleansing/ Exploratory Analysis</b><br>
+All unnecessary columns were removed by eliminating the features that were not rlevant to the model.
+First all columns that included more than 95% NA then all columns relating to case names and timestamps. Lastly all columns with a majority of blanks were also removed from the model.
+The remaining training set included the excercise category and 52 features.
+
+<b>Model Selection</b><br>
+The Random Forest algorithm was selected for its speed and accuracy for predicting the categories of the new data. It also reduced the need for extensive cross-validation because the optimizatiion is included in the agorithm. (explainied later in the cross validation section)
+Due to the size of the training set test samples were created to evaluate the responsveness and accuracy of the Random Forest algorithm.
+A list of 75% of the records was randomly selected from the training dataset and 25% for the testing set with replacement.
+
+
+<b>Cross Validation</b><br>
+Cross Validation is a testing method to measure the performance of a statistical model.
+Random Forests is a tree classification model that doesn't need a test sample because of its use of sampling for every tree. 
+Every tree in the forest model is built on about 63% of the available data and the remaining 37% is used for testing.
+Since the cross validation is designed in the algorithm, the model could be reliably executed without the need for additional manual cross validation steps.
+Using the training data set the algorithm estimates an Accuracy of .994 and Kappa of .992. With these values we could expect an out of sample error to b eless than 1%.
+<confusion matrix>
+```{r evaluate=TRUE}
+cnf
+```
+
+<b>Feature Selection</b><br>
+After the initial data cleansing, the remaining features were evaluated using the Importance function of the Random Forest algorithm.
+Running the Importance on the model can identify high performiing features andhelp to eliminate the the features that would not improve the model. The importance plot below shows the best performing features for the model.
+```{r evaluate=TRUE}
+varImpPlot(act.rf)
+```
+
+<b>Error Estimates</b><br>
+Running the Random Forest on the test set of 20 cases provided the following results.
+In the table below we can see that the rate of estimate error to be .29%. 
+```{r evaluate=TRUE}
+act.rf
+```
+
+<b>Conclusion</b><br>
+The RandomForest algorithm was selected for it speed and accuracy for predicting the categories of the new categorical data.
+It also reduced the need for extensive cross-validation because the optimizatiion is included in the agorithm.
+When run agianst the 20 test cases select all were predicted correctly.
